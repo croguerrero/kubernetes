@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: gcr.io/tim-acloud-guru/myapp:blue
+        image: gcr.io/...../myapp:blue ### add specific route
         ports:
         - containerPort: 8888
