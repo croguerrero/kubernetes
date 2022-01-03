@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: DaemonSet   
+metadata:
+  name: fluentd
+
+spec:
+  selector:
+   matchLabels:
+     name: fluentd
+  template:
+    metadata:
+      labels:
+        name: fluentd
+    spec:
+      nodeSelector:
+        type: prod
+      containers:
+        - name: fluentd
+          image: gcr.io/google-containers/fluent-elasticsearch:1:20
+    

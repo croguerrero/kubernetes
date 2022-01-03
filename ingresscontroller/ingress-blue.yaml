@@ -8,7 +8,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: / 
 spec:
   rules:
-  - host: myapp.example.com
+  - host: myapp.example.com  ##Set up the specific URL
     http:
       paths:
       - path: /blue
