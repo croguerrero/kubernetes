@@ -1,62 +1,77 @@
-provider "google" {
-  version = "~> 3.42.0"
-}
-module "gke_auth" {
-  source = "terraform-google-modules/kubernetes-engine/google//modules/auth"
-  depends_on   = [module.gke]
-  project_id   = var.project_id
-  location     = module.gke.location
-  cluster_name = module.gke.name
-}
-resource "local_file" "kubeconfig" {
-  content  = module.gke_auth.kubeconfig_raw
-  filename = "kubeconfig-${var.env_name}"
-}
-module "gcp-network" {
-  source       = "terraform-google-modules/network/google"
-  version      = "~> 2.5"
-  project_id   = var.project_id
-  network_name = "${var.network}-${var.env_name}"
-  subnets = [
+module "gke" {
+  source                     = "terraform-google-modules/kubernetes-engine/google"
+  version                    = "16.0.1"
+  project_id                 = var.project_id
+  region                     = var.region
+  zones                      = var.zones
+  name                       = var.name
+  network                    = "default"
+  subnetwork                 = "default"
+  ip_range_pods              = ""
+  ip_range_services          = ""
+  http_load_balancing        = false
+  horizontal_pod_autoscaling = true
+  kubernetes_dashboard       = true
+  network_policy             = true
+
+  node_pools = [
     {
-      subnet_name   = "${var.subnetwork}-${var.env_name}"
-      subnet_ip     = "10.10.0.0/16"
-      subnet_region = var.region
+      name               = "default-node-pool"
+      machine_type       = var.machine_type
+      min_count          = var.min_count
+      max_count          = var.max_count
+      disk_size_gb       = var.disk_size_gb
+      disk_type          = "pd-standard"
+      image_type         = "COS"
+      auto_repair        = true
+      auto_upgrade       = true
+      service_account    = var.service_account
+      preemptible        = false
+      initial_node_count = var.initial_node_count
     },
   ]
-  secondary_ranges = {
-    "${var.subnetwork}-${var.env_name}" = [
+
+  node_pools_oauth_scopes = {
+    all = []
+
+    default-node-pool = [
+      "https://www.googleapis.com/auth/cloud-platform",
+    ]
+  }
+
+  node_pools_labels = {
+    all = {}
+
+    default-node-pool = {
+      default-node-pool = true
+    }
+  }
+
+  node_pools_metadata = {
+    all = {}
+
+    default-node-pool = {
+      node-pool-metadata-custom-value = "my-node-pool"
+    }
+  }
+
+  node_pools_taints = {
+    all = []
+
+    default-node-pool = [
       {
-        range_name    = var.ip_range_pods_name
-        ip_cidr_range = "10.20.0.0/16"
-      },
-      {
-        range_name    = var.ip_range_services_name
-        ip_cidr_range = "10.30.0.0/16"
+        key    = "default-node-pool"
+        value  = true
+        effect = "PREFER_NO_SCHEDULE"
       },
     ]
   }
-}
 
-module "gke" {
-  source                 = "terraform-google-modules/kubernetes-engine/google//modules/private-cluster"
-  project_id             = var.project_id
-  name                   = "${var.cluster_name}-${var.env_name}"
-  regional               = true
-  region                 = var.region
-  network                = module.gcp-network.network_name
-  subnetwork             = module.gcp-network.subnets_names[0]
-  ip_range_pods          = var.ip_range_pods_name
-  ip_range_services      = var.ip_range_services_name
-  node_pools = [
-    {
-      name                      = "node-pool"
-      machine_type              = "e2-medium"
-      node_locations            = "europe-west1-b,europe-west1-c,europe-west1-d"
-      min_count                 = 1
-      max_count                 = 2
-      disk_size_gb              = 20
-    },
-  ]
-}
+  node_pools_tags = {
+    all = []
 
+    default-node-pool = [
+      "default-node-pool",
+    ]
+  }
+}
