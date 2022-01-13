@@ -1,77 +1,73 @@
-module "gke" {
-  source                     = "terraform-google-modules/kubernetes-engine/google"
-  version                    = "16.0.1"
-  project_id                 = var.project_id
-  region                     = var.region
-  zones                      = var.zones
-  name                       = var.name
-  network                    = "default"
-  subnetwork                 = "default"
-  ip_range_pods              = ""
-  ip_range_services          = ""
-  http_load_balancing        = false
-  horizontal_pod_autoscaling = true
-  kubernetes_dashboard       = true
-  network_policy             = true
+variable "region" {
+  default = "us-west1"
+}
 
-  node_pools = [
-    {
-      name               = "default-node-pool"
-      machine_type       = var.machine_type
-      min_count          = var.min_count
-      max_count          = var.max_count
-      disk_size_gb       = var.disk_size_gb
-      disk_type          = "pd-standard"
-      image_type         = "COS"
-      auto_repair        = true
-      auto_upgrade       = true
-      service_account    = var.service_account
-      preemptible        = false
-      initial_node_count = var.initial_node_count
-    },
-  ]
+variable "location" {
+  default = "us-west1-b"
+}
 
-  node_pools_oauth_scopes = {
-    all = []
+variable "network_name" {
+  default = "myapp"
+}
 
-    default-node-pool = [
-      "https://www.googleapis.com/auth/cloud-platform",
-    ]
+provider "google" {
+  region = var.region
+}
+
+resource "google_compute_network" "default" {
+  name                    = var.network_name
+  auto_create_subnetworks = false
+}
+
+resource "google_compute_subnetwork" "default" {
+  name                     = var.network_name
+  ip_cidr_range            = "10.127.0.0/20"
+  network                  = google_compute_network.default.self_link
+  region                   = var.region
+  private_ip_google_access = true
+}
+
+data "google_client_config" "current" {
+}
+
+data "google_container_engine_versions" "default" {
+  location = var.location
+}
+
+resource "google_container_cluster" "default" {
+  name               = var.network_name
+  location           = var.location
+  initial_node_count = 1
+  min_master_version = data.google_container_engine_versions.default.latest_master_version
+  network            = google_compute_subnetwork.default.name
+  subnetwork         = google_compute_subnetwork.default.name
+
+  
+  enable_legacy_abac = true
+
+ 
+  provisioner "local-exec" {
+    when    = destroy
+    command = "sleep 90"
   }
+}
 
-  node_pools_labels = {
-    all = {}
+output "network" {
+  value = google_compute_subnetwork.default.network
+}
 
-    default-node-pool = {
-      default-node-pool = true
-    }
-  }
+output "subnetwork_name" {
+  value = google_compute_subnetwork.default.name
+}
 
-  node_pools_metadata = {
-    all = {}
+output "cluster_name" {
+  value = google_container_cluster.default.name
+}
 
-    default-node-pool = {
-      node-pool-metadata-custom-value = "my-node-pool"
-    }
-  }
+output "cluster_region" {
+  value = var.region
+}
 
-  node_pools_taints = {
-    all = []
-
-    default-node-pool = [
-      {
-        key    = "default-node-pool"
-        value  = true
-        effect = "PREFER_NO_SCHEDULE"
-      },
-    ]
-  }
-
-  node_pools_tags = {
-    all = []
-
-    default-node-pool = [
-      "default-node-pool",
-    ]
-  }
+output "cluster_location" {
+  value = google_container_cluster.default.location
 }
